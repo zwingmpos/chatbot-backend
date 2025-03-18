@@ -20,10 +20,16 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 app.use(cors());
 app.use(express.json());
 
+// Ensure uploads directory exists
+const uploadDir = "uploads/";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 // File Upload Setup
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/");
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + "-" + file.originalname);
@@ -136,12 +142,26 @@ app.post("/send-message", upload.single("file"), async (req, res) => {
   }
 });
 
-// Fetch Messages for a Room
+// Fetch Messages of a Room
 app.get("/fetch-messages/:roomId", async (req, res) => {
   try {
     const { roomId } = req.params;
     const messages = await Message.find({ roomId }).sort({ timestamp: 1 });
+
     res.json({ status: 200, message: "Messages fetched successfully!", data: messages });
+  } catch (error) {
+    res.status(500).json({ status: 500, message: "Internal Server Error", data: error.message });
+  }
+});
+
+
+// Fetch Last Message of a Room
+app.get("/last-message/:roomId", async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const lastMessage = await Message.findOne({ roomId }).sort({ timestamp: -1 });
+
+    res.json({ status: 200, message: "Last message fetched successfully!", data: lastMessage });
   } catch (error) {
     res.status(500).json({ status: 500, message: "Internal Server Error", data: error.message });
   }
