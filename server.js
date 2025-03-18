@@ -20,6 +20,17 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 app.use(cors());
 app.use(express.json());
 
+// File Upload Setup
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+const upload = multer({ storage: storage });
+
 // MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -48,8 +59,8 @@ const Room = mongoose.model("Room", roomSchema);
 const messageSchema = new mongoose.Schema({
   roomId: String,
   sender: String,
-  content: String,
-  type: String, // "text" or "image"
+  content: String, // Text or file path
+  type: String, // "text", "image", or "pdf"
   timestamp: { type: Date, default: Date.now },
 });
 const Message = mongoose.model("Message", messageSchema);
@@ -98,13 +109,24 @@ app.post("/get-room", async (req, res) => {
   }
 });
 
-// Send Message
-app.post("/send-message", async (req, res) => {
+// Send Message (with File Upload Support)
+app.post("/send-message", upload.single("file"), async (req, res) => {
   try {
     const { roomId, sender, content, type } = req.body;
-    if (!roomId || !sender || !content || !type) return res.status(400).json({ status: 400, message: "Invalid input" });
+    const file = req.file;
 
-    const newMessage = new Message({ roomId, sender, content, type });
+    // Validate sender is in the room
+    const room = await Room.findById(roomId);
+    if (!room || !room.users.includes(sender)) {
+      return res.status(403).json({ status: 403, message: "Sender is not part of this room" });
+    }
+
+    let messageContent = content;
+    if (file) {
+      messageContent = `/uploads/${file.filename}`;
+    }
+
+    const newMessage = new Message({ roomId, sender, content: messageContent, type });
     await newMessage.save();
 
     io.to(roomId).emit("newMessage", newMessage);
@@ -120,17 +142,6 @@ app.get("/fetch-messages/:roomId", async (req, res) => {
     const { roomId } = req.params;
     const messages = await Message.find({ roomId }).sort({ timestamp: 1 });
     res.json({ status: 200, message: "Messages fetched successfully!", data: messages });
-  } catch (error) {
-    res.status(500).json({ status: 500, message: "Internal Server Error", data: error.message });
-  }
-});
-
-// Get Last Message for a Room
-app.get("/last-message/:roomId", async (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const lastMessage = await Message.findOne({ roomId }).sort({ timestamp: -1 });
-    res.json({ status: 200, message: "Last message fetched successfully!", data: lastMessage });
   } catch (error) {
     res.status(500).json({ status: 500, message: "Internal Server Error", data: error.message });
   }
@@ -153,4 +164,3 @@ io.on("connection", (socket) => {
 server.listen(port, () => {
   console.log(`🚀 Server running on http://localhost:${port}`);
 });
-
