@@ -1,5 +1,6 @@
 const Room = require("../models/Room");
 const Message = require("../models/Message");
+const User = require("../models/User")
 const multer = require("multer");
 
 // File Upload Setup
