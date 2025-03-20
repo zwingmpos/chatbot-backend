@@ -50,14 +50,21 @@ mongoose
 const userSchema = new mongoose.Schema({
   fullname: String,
   username: String,
+  number:String,
   userId: { type: Number, unique: true },
   role: String,
 });
 const User = mongoose.model("User", userSchema);
 
 // Room Schema
+// const roomSchema = new mongoose.Schema({
+//   users: [String], // Array of user IDs
+// });
+// const Room = mongoose.model("Room", roomSchema);
+
+// Room Schema
 const roomSchema = new mongoose.Schema({
-  users: [String], // Array of user IDs
+  users: [{ userId: Number, autoId: mongoose.Schema.Types.ObjectId }],
 });
 const Room = mongoose.model("Room", roomSchema);
 
@@ -75,12 +82,12 @@ const Message = mongoose.model("Message", messageSchema);
 app.post("/create-user", async (req, res) => {
   try {
     const { fullname, username, role } = req.body;
-    if (!fullname || !username || !role) return res.status(400).json({ status: 400, message: "All fields are required" });
+    if (!fullname || !number || !username || !role) return res.status(400).json({ status: 400, message: "All fields are required" });
 
     const lastUser = await User.findOne().sort({ userId: -1 });
     const userId = lastUser ? lastUser.userId + 1 : 1;
 
-    const newUser = new User({ fullname, username, userId, role });
+    const newUser = new User({ fullname, number, username, userId, role });
     await newUser.save();
     res.json({ status: 200, message: "User created successfully!", data: newUser });
   } catch (error) {
@@ -99,14 +106,31 @@ app.get("/fetch-users", async (req, res) => {
 });
 
 // Get or Create Room
+// app.post("/get-room", async (req, res) => {
+//   try {
+//     const { user1, user2 } = req.body;
+//     if (!user1 || !user2) return res.status(400).json({ status: 400, message: "User IDs are required" });
+
+//     let room = await Room.findOne({ users: { $all: [user1, user2] } });
+//     if (!room) {
+//       room = new Room({ users: [user1, user2] });
+//       await room.save();
+//     }
+//     res.json({ status: 200, message: "Room retrieved successfully!", data: room });
+//   } catch (error) {
+//     res.status(500).json({ status: 500, message: "Internal Server Error", data: error.message });
+//   }
+// });
+
+// Get or Create Room
 app.post("/get-room", async (req, res) => {
   try {
     const { user1, user2 } = req.body;
     if (!user1 || !user2) return res.status(400).json({ status: 400, message: "User IDs are required" });
 
-    let room = await Room.findOne({ users: { $all: [user1, user2] } });
+    let room = await Room.findOne({ "users.userId": { $all: [user1, user2] } });
     if (!room) {
-      room = new Room({ users: [user1, user2] });
+      room = new Room({ users: [{ userId: user1 }, { userId: user2 }] });
       await room.save();
     }
     res.json({ status: 200, message: "Room retrieved successfully!", data: room });
