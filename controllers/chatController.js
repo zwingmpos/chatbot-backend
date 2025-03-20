@@ -46,32 +46,31 @@ exports.createRooms =  async (req, res) => {
     }
   };
 
-// Send Message (with File Upload Support)
+  // ✅ Send Message
 exports.sendMessage = async (req, res) => {
-    try {
-      const { roomId, sender, content, type } = req.body;
-      const file = req.file;
-  
-      // Validate sender is in the room
-      const room = await Room.findById(roomId);
-      if (!room || !room.users.includes(sender)) {
-        return res.status(403).json({ status: 403, message: "Sender is not part of this room" });
-      }
-  
-      let messageContent = content;
-      if (file) {
-        messageContent = `/uploads/${file.filename}`;
-      }
-  
-      const newMessage = new Message({ roomId, sender, content: messageContent, type });
-      await newMessage.save();
-  
-      io.to(roomId).emit("newMessage", newMessage);
-      res.json({ status: 200, message: "Message sent successfully!", data: newMessage });
-    } catch (error) {
-      res.status(500).json({ status: 500, message: "Internal Server Error", data: error.message });
+  try {
+    const { roomId, sender, content, type } = req.body;
+    const file = req.file;
+
+    // Validate sender is in the room
+    const room = await Room.findById(roomId);
+    if (!room || !room.users.includes(sender)) {
+      return res.status(403).json({ status: 403, message: "Sender is not part of this room" });
     }
-  };
+
+    let messageContent = content;
+    if (file) {
+      messageContent = `/uploads/${file.filename}`;
+    }
+
+    const newMessage = new Message({ roomId, sender, content: messageContent, type });
+    await newMessage.save();
+
+    res.json({ status: 200, message: "Message sent successfully!", data: newMessage });
+  } catch (error) {
+    res.status(500).json({ status: 500, message: "Internal Server Error", data: error.message });
+  }
+};
 
 
 // Fetch Messages of a Room
